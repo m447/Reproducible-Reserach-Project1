@@ -1,0 +1,126 @@
+---
+title: "Reproducible Research: Peer Assignment"
+output: html_document
+---
+
+
+## Loading And Preparing Data
+Following code was used to load data into R and exlore the data.
+```{r }
+steps_data <- read.csv("activity.csv")
+str(steps_data)
+head(steps_data)
+```
+
+Date variable was converted to date class.
+```{r }
+steps_data$date <- as.Date(steps_data$date,format="%Y-%m-%d")
+```
+
+
+## What is mean total number of steps taken per day?
+For this part of the assignment, the missing values in the dataset were ignored.
+
+The dataset was grouped and summarized usig dplyr package commands to calculate the number of steps per day.
+```{r }
+library(dplyr)
+steps_per_day <- group_by(steps_data,date)
+steps_per_day <- summarise(steps_per_day,total=sum(steps,na.rm = T))
+```
+
+Histogram was constucted after grouping and summarizing data by date.
+```{r }
+hist(steps_per_day$total,
+        breaks = 15,
+        main = "Total Number of Steps Taked Each Day",
+        xlab = "Number of Steps"
+        )
+```
+
+Mean and median of total number of steps taken per day were calculated as follows:
+```{r }
+mean(steps_per_day$total)
+median(steps_per_day$total)
+```
+
+
+## What is the average daily activity pattern?
+In order to calculated the average daily activity pattern during the 5 minutes interval, the data were grouped by 5 minutes interval information and summarized using dplyr package.
+```{r }
+avg_per_interval <- group_by(steps_data,interval)
+avg_per_interval <- summarise(avg_per_interval,average=mean(steps,na.rm = T))
+```
+
+Time series plot of data summarized by interval information was made as follows usinng ggplot package:
+```{r }
+library(ggplot2)
+g <- ggplot(avg_per_interval,aes(x=interval,y=average))
+g + geom_line() + ggtitle("Average Steps Per Interval During a Day") + 
+        labs(y="Average Number of Steps") + 
+        labs(x="Interval")
+```
+
+"Which 5 minute interval, on average accross all days in the dataset, contains the maximumnumber of steps"
+The code below was used to answer above mentioned question:
+```{r }
+max(avg_per_interval$average)
+which.max(avg_per_interval$average)
+avg_per_interval[104,]
+```
+The maximum of average number of steps is 206 steps and it occurs in row number 104 of dataset and it belong to the interval 835.
+
+
+## Imputing missing values
+Total number of missing values was caculated as follows:
+```{r }
+nrow(steps_data[!complete.cases(steps_data),])
+nrow(steps_data[!complete.cases(steps_data),])/nrow(steps_data)
+```
+There are 2304 missing values in "steps" variable of the dataset, which corresponds to considerable 13% of all steps measurements.
+
+Simple strategy for filling in all missing data was selected. Collumn mean was used to replace missing values in "steps" variable.
+```{r }
+imputed_data <- steps_data
+imputed_data$steps[which(is.na(steps_data$steps)==TRUE)] <- mean(steps_data$steps, na.rm = T)
+
+```
+
+Histogram was constucted using dataset with imputed values as follows:
+```{r }
+steps_per_day <- group_by(imputed_data,date)
+steps_per_day <- summarise(steps_per_day,total=sum(steps))
+hist(steps_per_day$total,
+        breaks = 15,
+        main = "Total Number of Steps Taked Each Day",
+        xlab = "Number of Steps"
+        )
+```
+
+The impact of imputing missing data is visible - the histogram skewiness is eliminated and the distribution of the data appears to be more symetrical.
+
+
+## Are there differences in activity patterns between weekdays and weekends?
+The new factor variable was added to the dataset that identifies "weekday"" and "weekend"" days.
+
+```{r }
+imputed_data$weekend <- sapply(imputed_data$date,function(d) {as.POSIXlt(d)$wday}) %in% c(0,6)
+weekday <- subset(imputed_data,weekend==FALSE)
+weekend <- subset(imputed_data,weekend==TRUE)
+weekday <- group_by(weekday,interval)
+weekday <- summarise(weekday,average=mean(steps))
+weekend <- group_by(weekend,interval)
+weekend <- summarise(weekend,average=mean(steps))
+weekday$id <- "weekday"
+weekend$id <- "weekend"
+steps_by_weekday <- rbind(weekday,weekend)
+```
+
+The panel plot comparing "weekday" and "weekend" data was prepared:
+```{r }
+g <- ggplot(steps_by_weekday,aes(interval,average))
+g + geom_line() + facet_grid(id~.) + 
+        ggtitle("Average Number of Steps Per 5-min. Interval Accross Weekdays and Weekends") +
+        labs(y="Average Number of Steps") + labs(x="Interval")
+```
+
+There are significant differences in activity patterns between weekdays and weekends. There is significant peak in activity during weekdays in the morning - above 200 steps. The activity during the rest of the day in weekdays remains under 100 steps. On the other side, the activity during weekends does not have significant peak in the morning. There is higher activity during the rest of the day in weekends (under 125 steps) as coompared with weekdays (under 100 steps).
